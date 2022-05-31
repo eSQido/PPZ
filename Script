@@ -33,6 +33,7 @@
     New-VHD -ParentPath $windowsServerBasicDrivePath -Path ($DrivesLocalisation+"\ServerDiffDrive.vhdx") -Differencing
     new-vm -Name ($VMname+"Server") -Path $VMLocalisation -VHDPath ($DrivesLocalisation+"\ServerDiffDrive.vhdx")
 #Konfiguracja serwera
+    $fullDomainName="ocean.local"
     $domainName="ocean"
     $passwordServer = ConvertTo-SecureString "zaq1@WSX" -AsPlainText -Force
     $credServer= New-Object System.Management.Automation.PSCredential ("Administrator", $password )
@@ -45,7 +46,7 @@
     Set-DnsClientServerAddress -InterfaceIndex 7 -ServerAddresses ("10.10.10.1")
     Install-windowsfeature AD-domain-services
     Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
-    Install-ADDSDomainController -InstallDns -Credential (Get-Credential $domainName\administrator) -DomainName ($domainName+".local") -SafeModeAdministratorPassword (ConvertTo-SecureString -AsPlainText $passwordServer -Force)
+    Install-ADDSDomainController -InstallDns -Credential (Get-Credential $domainName\administrator) -DomainName $fullDomainName -SafeModeAdministratorPassword (ConvertTo-SecureString -AsPlainText $passwordServer -Force)
     New-ADOrganizationalUnit -Name "Management" -Path "DC=$domainName.ToUpper(),DC=LOCAL"
     New-ADOrganizationalUnit -Name "IT" -Path "DC=$domainName.ToUpper(),DC=LOCAL"
     New-ADOrganizationalUnit -Name "Logistic" -Path "DC=$domainName.ToUpper(),DC=LOCAL"
@@ -73,7 +74,7 @@ foreach ($user in $Users) {
         # Jezeli użytkownik nie istnieje to go tworzymy 
         New-ADUser `
             -SamAccountName $username `
-            -UserPrincipalName "$username@$domainName+".local"" `
+            -UserPrincipalName "$username@$fullDomainName `
             -Name "$firstname $lastname" `
             -GivenName $firstname `
             -Surname $lastname `
@@ -104,7 +105,8 @@ foreach ($user in $Users) {
         Rename-Computer -NewName ($VMname+$i)
         Remove-NetIPAddress -Confirm True
         New-NetIPAddress -InterfaceIndex 7 -IPAddress ($VMIpAddress+$i) -PrefixLength 24
-    
+        Add-Computer -DomainName $fullDomainName -Credential $credServer -Restart
+       
         Exit-PSSession
         Stop-VM -Name ($VMname+$i)
     }
